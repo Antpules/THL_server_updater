@@ -1,0 +1,21 @@
+{
+  "version": "1.0.0.1",
+  "package": "server-app-1.0.0.1.tar.gz",
+  "description": "Server application update",
+  "release_date": "2026-01-15",
+  "changelog": [
+    "Fixed critical bug in network module",
+    "Improved performance of data processing",
+    "Added new configuration options",
+    "Updated dependencies"
+  ],
+  "verify": {
+    "method": "SHA256",
+    "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "metadata": {
+    "build_number": "1234",
+    "branch": "master",
+    "author": "Update System"
+  }
+}
