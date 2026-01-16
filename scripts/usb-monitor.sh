@@ -24,13 +24,19 @@ log_message() {
     local level="$1"
     local message="$2"
     local timestamp=$(date +"%Y-%m-%d %H:%M:%S")
+    # 将日志级别转换为中文
+    case $level in
+        INFO) level="信息" ;;
+        ERROR) level="错误" ;;
+        DEBUG) level="调试" ;;
+    esac
     echo "[$timestamp] [$level] $message" >> "$LOG_FILE"
     echo "[$timestamp] [$level] $message"
 }
 
 # 监控U盘函数
 monitor_usb() {
-    log_message "INFO" "Starting USB monitor"
+    log_message "INFO" "U盘监控已启动"
     
     # 创建临时文件用于存储inotify事件
     local event_file=$(mktemp)
@@ -42,7 +48,7 @@ monitor_usb() {
         
         if [ $? -eq 0 ]; then
             local events=$(cat "$event_file")
-            log_message "DEBUG" "Received inotify events: $events"
+            log_message "调试" "收到inotify事件: $events"
             
             # 检查每个挂载点
             for mount_point in $USB_MOUNT_POINTS; do
@@ -51,7 +57,7 @@ monitor_usb() {
                         if [ -d "$device_dir" ]; then
                             # 检查是否存在update.json文件
                             if [ -f "$device_dir/update.json" ]; then
-                                log_message "INFO" "Detected update.json in $device_dir"
+                                log_message "信息" "在 $device_dir 中检测到 update.json"
                                 
                                 # 触发更新流程
                                 "$SCRIPT_DIR/update-manager.sh" --usb "$device_dir"
@@ -64,7 +70,7 @@ monitor_usb() {
                 fi
             done
         else
-            log_message "ERROR" "inotifywait failed, restarting monitor"
+            log_message "错误" "inotifywait失败，正在重启监控"
             sleep 5
         fi
     done
@@ -75,7 +81,7 @@ monitor_usb() {
 
 # 检查inotifywait是否安装
 if ! command -v inotifywait &> /dev/null; then
-    log_message "ERROR" "inotifywait is not installed. Please install inotify-tools."
+    log_message "错误" "未安装inotifywait，请安装inotify-tools."
     exit 1
 fi
 

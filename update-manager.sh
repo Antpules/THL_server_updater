@@ -30,6 +30,12 @@ log_message() {
     local level="$1"
     local message="$2"
     local timestamp=$(date +"%Y-%m-%d %H:%M:%S")
+    # 将日志级别转换为中文
+    case $level in
+        INFO) level="信息" ;;
+        ERROR) level="错误" ;;
+        WARNING) level="警告" ;;
+    esac
     echo "[$timestamp] [$level] $message" >> "$LOG_FILE"
     echo "[$timestamp] [$level] $message"
 }
@@ -40,69 +46,82 @@ log_message() {
 update_status() {
     local status="$1"
     local message="$2"
+    # 将状态转换为中文
+    case $status in
+        READY) status_cn="就绪" ;;
+        UPDATING) status_cn="更新中" ;;
+        COMPLETED) status_cn="完成" ;;
+        FAILED) status_cn="失败" ;;
+        SKIPPED) status_cn="跳过" ;;
+        ERROR) status_cn="错误" ;;
+        *) status_cn="未知" ;;
+    esac
     echo "STATUS:$status" > "$STATUS_FILE"
     echo "MESSAGE:$message" >> "$STATUS_FILE"
-    log_message "INFO" "Status updated: $status - $message"
+    log_message "INFO" "状态更新: $status_cn - $message"
 }
 
 # 检查U盘更新函数
 check_usb_update() {
-    log_message "INFO" "Checking for USB update..."
+    log_message "INFO" "正在检查U盘更新..."
     
-    # 遍历可能的挂载点
-    for mount_point in /media/* /mnt/*; do
-        if [ -d "$mount_point" ]; then
-            # 检查是否存在update.json配置文件
-            if [ -f "$mount_point/update.json" ]; then
-                log_message "INFO" "Found update.json in $mount_point"
-                
-                # 解析update.json文件
-                local update_config=$(cat "$mount_point/update.json")
-                local package_name=$(echo "$update_config" | grep -o '"package": "[^"]*"' | cut -d '"' -f 4)
-                local version=$(echo "$update_config" | grep -o '"version": "[^"]*"' | cut -d '"' -f 4)
-                
-                # 检查更新包是否存在
-                if [ -f "$mount_point/$package_name" ]; then
-                    log_message "INFO" "Found update package: $package_name (version: $version)"
+    # 遍历配置的挂载点
+    for base_mount in $USB_MOUNT_POINTS; do
+        for mount_point in $base_mount/*; do
+            if [ -d "$mount_point" ]; then
+                log_message "INFO" "检测到U盘挂载: $mount_point"
+                # 检查是否存在update.json配置文件
+                if [ -f "$mount_point/update.json" ]; then
+                    log_message "INFO" "在 $mount_point 中找到 update.json"
                     
-                    # 获取当前版本
-                    local current_version=$(cat "$APP_DIR/version.txt" 2>/dev/null || echo "0.0.0.0")
-                    log_message "INFO" "Current version: $current_version, Update version: $version"
+                    # 解析update.json文件
+                    local update_config=$(cat "$mount_point/update.json")
+                    local package_name=$(echo "$update_config" | grep -o '"package": "[^"]*"' | cut -d '"' -f 4)
+                    local version=$(echo "$update_config" | grep -o '"version": "[^"]*"' | cut -d '"' -f 4)
                     
-                    # 检查版本是否需要更新
-                    if "$SCRIPTS_DIR/version-check.sh" "$current_version" "$version"; then
-                        log_message "INFO" "Version check passed, proceeding with update"
+                    # 检查更新包是否存在
+                    if [ -f "$mount_point/$package_name" ]; then
+                        log_message "INFO" "找到更新包: $package_name (版本: $version)"
                         
-                        # 更新状态为正在更新
-                        update_status "UPDATING" "Starting update from USB"
+                        # 获取当前版本
+                        local current_version=$(cat "$APP_DIR/version.txt" 2>/dev/null || echo "0.0.0.0")
+                        log_message "INFO" "当前版本: $current_version, 更新版本: $version"
                         
-                        # 复制更新包和配置文件到临时目录
-                        cp "$mount_point/$package_name" "$TEMP_DIR/"
-                        cp "$mount_point/update.json" "$TEMP_DIR/"
-                        
-                        # 调用部署代理执行更新
-                        "$SCRIPT_DIR/deploy-agent.sh" "$TEMP_DIR/$package_name" "$TEMP_DIR/update.json"
-                        
-                        # 更新状态为完成
-                        update_status "COMPLETED" "Update completed successfully"
-                        log_message "INFO" "Update completed successfully"
+                        # 检查版本是否需要更新
+                        if "$SCRIPTS_DIR/version-check.sh" "$current_version" "$version"; then
+                            log_message "INFO" "版本检查通过，开始更新"
+                            
+                            # 更新状态为正在更新
+                            update_status "UPDATING" "开始从U盘更新"
+                            
+                            # 复制更新包和配置文件到临时目录
+                            cp "$mount_point/$package_name" "$TEMP_DIR/"
+                            cp "$mount_point/update.json" "$TEMP_DIR/"
+                            
+                            # 调用部署代理执行更新
+                            "$SCRIPT_DIR/deploy-agent.sh" "$TEMP_DIR/$package_name" "$TEMP_DIR/update.json"
+                            
+                            # 更新状态为完成
+                            update_status "COMPLETED" "更新成功完成"
+                            log_message "INFO" "更新成功完成"
+                        else
+                            log_message "INFO" "版本检查失败，跳过更新"
+                            update_status "SKIPPED" "版本检查失败"
+                        fi
                     else
-                        log_message "INFO" "Version check failed, skipping update"
-                        update_status "SKIPPED" "Version check failed"
+                        log_message "ERROR" "未找到更新包 $package_name"
+                        update_status "ERROR" "未找到更新包"
                     fi
-                else
-                    log_message "ERROR" "Update package $package_name not found"
-                    update_status "ERROR" "Update package not found"
                 fi
             fi
-        fi
+        done
     done
 }
 
 # 主函数
 main() {
-    log_message "INFO" "Update manager started"
-    update_status "READY" "Waiting for update trigger"
+    log_message "INFO" "更新管理器已启动"
+    update_status "READY" "等待更新触发"
     
     # 无限循环检查更新
     while true; do
@@ -113,7 +132,7 @@ main() {
 
 # 检查是否以root权限运行
 if [ "$(id -u)" -ne 0 ]; then
-    log_message "ERROR" "Script must be run as root"
+    log_message "ERROR" "脚本必须以root权限运行"
     exit 1
 fi
 
