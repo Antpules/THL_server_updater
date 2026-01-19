@@ -14,13 +14,21 @@ LOG_DIR="$SCRIPT_DIR/logs"
 # 加载配置文件
 source "$CONFIG_FILE"
 
-# 日志文件路径
-LOG_FILE="$LOG_DIR/usb-monitor.log"
+# 日志配置
+# 日期文件夹：YYYY-MM-DD
+LOG_DATE_DIR="$LOG_DIR/$(date +"%Y-%m-%d")"
+# 服务启动时间：HHMMSS
+START_TIME=$(date +"%H%M%S")
+# 日志文件路径：日期文件夹/服务_启动时间.log
+LOG_FILE="$LOG_DATE_DIR/usb-monitor_$START_TIME.log"
 
 # 日志记录函数
 # 参数1: 日志级别 (INFO, ERROR, DEBUG)
 # 参数2: 日志消息
 log_message() {
+    # 确保日期文件夹存在
+    mkdir -p "$LOG_DATE_DIR"
+    
     local level="$1"
     local message="$2"
     local timestamp=$(date +"%Y-%m-%d %H:%M:%S")

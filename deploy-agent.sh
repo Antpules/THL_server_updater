@@ -18,13 +18,21 @@ TEMP_DIR="$SCRIPT_DIR/temp"
 # 加载配置文件
 source "$CONFIG_FILE"
 
-# 部署日志文件路径
-DEPLOY_LOG="$LOG_DIR/deploy-agent.log"
+# 日志配置
+# 日期文件夹：YYYY-MM-DD
+LOG_DATE_DIR="$LOG_DIR/$(date +"%Y-%m-%d")"
+# 服务启动时间：HHMMSS
+START_TIME=$(date +"%H%M%S")
+# 日志文件路径：日期文件夹/服务_启动时间.log
+DEPLOY_LOG="$LOG_DATE_DIR/deploy-agent_$START_TIME.log"
 
 # 日志记录函数
 # 参数1: 日志级别 (INFO, ERROR, WARNING)
 # 参数2: 日志消息
 log_message() {
+    # 确保日期文件夹存在
+    mkdir -p "$LOG_DATE_DIR"
+    
     local level="$1"
     local message="$2"
     local timestamp=$(date +"%Y-%m-%d %H:%M:%S")
@@ -39,13 +47,38 @@ log_message() {
 }
 
 # 备份当前文件函数
+# 参数1: 目标版本号
 # 返回值: 备份目录路径
 backup_current_files() {
-    local backup_dir="$TEMP_DIR/backup_$(date +"%Y%m%d_%H%M%S")"
+    local target_version="$1"
+    # 使用版本号命名备份目录：back_版本_before
+    local backup_dir="$TEMP_DIR/back_${target_version}_before"
+    
+    # 检查备份目录是否已存在
+    if [ -d "$backup_dir" ]; then
+        log_message "INFO" "版本 $target_version 的备份已存在: $backup_dir，跳过备份"
+        echo "$backup_dir"
+        return 0
+    fi
+    
+    # 备份目录不存在，创建备份
     log_message "INFO" "正在 $backup_dir 创建备份"
     
     mkdir -p "$backup_dir"
-    cp -r "$APP_DIR"/* "$backup_dir/" 2>/dev/null || true
+    
+    # 如果指定了可执行文件名，仅备份该文件
+    if [ -n "$EXECUTABLE_NAME" ] && [ -f "$APP_DIR/$EXECUTABLE_NAME" ]; then
+        log_message "INFO" "仅备份可执行文件: $EXECUTABLE_NAME"
+        cp "$APP_DIR/$EXECUTABLE_NAME" "$backup_dir/" 2>/dev/null || true
+        # 同时备份版本文件
+        if [ -f "$APP_DIR/$VERSION_FILE" ]; then
+            cp "$APP_DIR/$VERSION_FILE" "$backup_dir/" 2>/dev/null || true
+        fi
+    else
+        # 否则备份整个目录
+        log_message "INFO" "备份整个应用目录"
+        cp -r "$APP_DIR"/* "$backup_dir/" 2>/dev/null || true
+    fi
     
     echo "$backup_dir"
 }
@@ -87,8 +120,20 @@ rollback() {
     log_message "ERROR" "正在回滚到备份: $backup_dir"
     
     if [ -d "$backup_dir" ]; then
-        rm -rf "$APP_DIR"/* 2>/dev/null || true
-        cp -r "$backup_dir"/* "$APP_DIR/" 2>/dev/null || true
+        # 如果指定了可执行文件名，仅回滚该文件
+        if [ -n "$EXECUTABLE_NAME" ] && [ -f "$backup_dir/$EXECUTABLE_NAME" ]; then
+            log_message "INFO" "仅回滚可执行文件: $EXECUTABLE_NAME"
+            cp "$backup_dir/$EXECUTABLE_NAME" "$APP_DIR/" 2>/dev/null || true
+            # 同时回滚版本文件
+            if [ -f "$backup_dir/$VERSION_FILE" ]; then
+                cp "$backup_dir/$VERSION_FILE" "$APP_DIR/" 2>/dev/null || true
+            fi
+        else
+            # 否则回滚整个目录
+            log_message "INFO" "回滚整个应用目录"
+            rm -rf "$APP_DIR"/* 2>/dev/null || true
+            cp -r "$backup_dir"/* "$APP_DIR/" 2>/dev/null || true
+        fi
         
         start_service
         log_message "INFO" "回滚完成"
@@ -107,29 +152,71 @@ deploy_update() {
     
     log_message "INFO" "正在开始部署 $package_path"
     
-    # 创建备份
-    local backup_dir=$(backup_current_files)
+    # 从配置文件中获取目标版本
+    local target_version=$(grep -o '"version": "[^"]*"' "$config_path" | cut -d '"' -f 4)
+    if [ -z "$target_version" ]; then
+        # 如果未获取到版本，使用时间戳作为临时版本
+        target_version="temp_$(date +"%Y%m%d_%H%M%S")"
+        log_message "WARNING" "未从配置文件获取到版本，使用临时版本: $target_version"
+    fi
+    
+    # 创建备份（仅更新前备份一次，使用版本号命名）
+    local backup_dir=$(backup_current_files "$target_version")
     
     # 停止服务
     stop_service
     
-    # 创建部署目录
-    local deploy_dir="$TEMP_DIR/deploy_$(date +"%Y%m%d_%H%M%S")"
-    mkdir -p "$deploy_dir"
-    
-    # 解压更新包
-    log_message "INFO" "正在解压更新包"
-    tar -xzf "$package_path" -C "$deploy_dir"
-    
-    # 部署文件
-    log_message "INFO" "正在部署文件到 $APP_DIR"
-    rm -rf "$APP_DIR"/* 2>/dev/null || true
-    cp -r "$deploy_dir"/* "$APP_DIR/"
-    
-    # 设置权限
-    log_message "INFO" "正在设置权限"
-    chmod +x "$APP_DIR"/*.sh 2>/dev/null || true
-    chmod +x "$APP_DIR"/*.bin 2>/dev/null || true
+    # 检查是否为单个可执行文件更新
+    if [[ "$package_path" != *.tar.gz ]] && [ "$SUPPORT_SINGLE_EXECUTABLE" = "true" ]; then
+        log_message "INFO" "使用单个可执行文件更新模式"
+        
+        # 获取可执行文件名
+        local executable_name="$EXECUTABLE_NAME"
+        if [ -z "$executable_name" ]; then
+            # 如果配置文件中未指定，使用包名作为可执行文件名
+            executable_name=$(basename "$package_path")
+            log_message "INFO" "未配置可执行文件名，使用包名: $executable_name"
+        fi
+        
+        # 复制可执行文件到应用目录
+        log_message "INFO" "正在复制可执行文件到 $APP_DIR/$executable_name"
+        cp "$package_path" "$APP_DIR/$executable_name"
+        
+        # 设置执行权限
+        log_message "INFO" "正在设置可执行权限"
+        chmod +x "$APP_DIR/$executable_name"
+        
+        # 更新version.txt
+        log_message "INFO" "正在更新版本文件，版本: $target_version"
+        echo "$target_version" > "$APP_DIR/$VERSION_FILE"
+    else
+        # 原有tar.gz包更新流程
+        log_message "INFO" "使用tar.gz包更新模式"
+        
+        # 创建部署目录
+        local deploy_dir="$TEMP_DIR/deploy_${target_version}"
+        mkdir -p "$deploy_dir"
+        
+        # 解压更新包
+        log_message "INFO" "正在解压更新包"
+        tar -xzf "$package_path" -C "$deploy_dir"
+        
+        # 部署文件
+        log_message "INFO" "正在部署文件到 $APP_DIR"
+        rm -rf "$APP_DIR"/* 2>/dev/null || true
+        cp -r "$deploy_dir"/* "$APP_DIR/"
+        
+        # 设置权限
+        log_message "INFO" "正在设置权限"
+        chmod +x "$APP_DIR"/*.sh 2>/dev/null || true
+        chmod +x "$APP_DIR"/*.bin 2>/dev/null || true
+        
+        # 如果version.txt不存在或内容不同，更新它
+        if [ ! -f "$APP_DIR/$VERSION_FILE" ] || [ "$(cat "$APP_DIR/$VERSION_FILE")" != "$target_version" ]; then
+            log_message "INFO" "正在更新版本文件，版本: $target_version"
+            echo "$target_version" > "$APP_DIR/$VERSION_FILE"
+        fi
+    fi
     
     # 启动服务并验证
     if start_service; then
@@ -155,8 +242,19 @@ verify_package() {
         return 1
     fi
     
-    if ! tar -tzf "$package_path" >/dev/null 2>&1; then
-        log_message "ERROR" "无效的包格式"
+    # 检查是否为tar.gz文件
+    if [[ "$package_path" == *.tar.gz ]]; then
+        # 验证tar.gz格式
+        if ! tar -tzf "$package_path" >/dev/null 2>&1; then
+            log_message "ERROR" "无效的tar.gz包格式"
+            return 1
+        fi
+    elif [ "$SUPPORT_SINGLE_EXECUTABLE" = "true" ]; then
+        # 单个可执行文件，无需解压验证，只需检查是否为文件
+        log_message "INFO" "单个可执行文件验证通过"
+        return 0
+    else
+        log_message "ERROR" "不支持的包格式"
         return 1
     fi
     
