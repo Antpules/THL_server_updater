@@ -17,14 +17,25 @@
 
 ## 三、快速安装
 
-### 1. 复制文件
+### 1. 一键安装（推荐）
+```bash
+# 设置脚本可执行权限
+chmod +x install.sh
+
+# 以root权限执行安装脚本
+sudo ./install.sh
+```
+
+### 2. 手动安装（可选）
+
+#### 2.1 复制文件
 ```bash
 sudo cp -r update /usr/local/
 sudo chmod +x /usr/local/update/*.sh
 sudo chmod +x /usr/local/update/scripts/*.sh
 ```
 
-### 2. 配置系统服务
+#### 2.2 配置系统服务
 ```bash
 sudo cp /usr/local/update/update-manager.service /etc/systemd/system/
 sudo systemctl daemon-reload
@@ -32,7 +43,7 @@ sudo systemctl enable update-manager
 sudo systemctl start update-manager
 ```
 
-### 3. 安装依赖
+#### 2.3 安装依赖
 ```bash
 # 安装inotify-tools（用于U盘监控）
 sudo apt-get install inotify-tools   # Debian/Ubuntu
@@ -114,6 +125,7 @@ tail -f /usr/local/update/logs/$(date +"%Y-%m-%d")/update-manager_*.log
 |------|------|------|
 | 1.0.0 | 2024-01-15 | 初始版本，支持U盘更新和基本功能 |
 | 1.1.0 | 2026-01-19 | 支持单个可执行文件更新，优化日志管理和备份机制 |
+| 1.2.0 | 2026-01-27 | 添加一键安装脚本，支持自动安装和配置 |
 
 ## 九、注意事项
 

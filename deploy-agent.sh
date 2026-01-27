@@ -2,7 +2,7 @@
 #
 # deploy-agent.sh - 部署代理脚本
 # 功能：处理具体的文件替换和服务重启
-# 作者：AutoGen
+# 作者：RUAN
 # 版本：1.0.0
 #
 
@@ -193,6 +193,15 @@ deploy_update() {
         # 原有tar.gz包更新流程
         log_message "INFO" "使用tar.gz包更新模式"
         
+        # 确定tar.gz包的安装路径
+        local install_dir="$APP_DIR"
+        if [ -n "$TAR_GZ_INSTALL_DIR" ]; then
+            install_dir="$TAR_GZ_INSTALL_DIR"
+            log_message "INFO" "使用配置的tar.gz安装路径: $install_dir"
+        else
+            log_message "INFO" "使用默认安装路径: $install_dir"
+        fi
+        
         # 创建部署目录
         local deploy_dir="$TEMP_DIR/deploy_${target_version}"
         mkdir -p "$deploy_dir"
@@ -201,20 +210,23 @@ deploy_update() {
         log_message "INFO" "正在解压更新包"
         tar -xzf "$package_path" -C "$deploy_dir"
         
+        # 确保安装目录存在
+        mkdir -p "$install_dir"
+        
         # 部署文件
-        log_message "INFO" "正在部署文件到 $APP_DIR"
-        rm -rf "$APP_DIR"/* 2>/dev/null || true
-        cp -r "$deploy_dir"/* "$APP_DIR/"
+        log_message "INFO" "正在部署文件到 $install_dir"
+        rm -rf "$install_dir"/* 2>/dev/null || true
+        cp -r "$deploy_dir"/* "$install_dir/"
         
         # 设置权限
         log_message "INFO" "正在设置权限"
-        chmod +x "$APP_DIR"/*.sh 2>/dev/null || true
-        chmod +x "$APP_DIR"/*.bin 2>/dev/null || true
+        chmod +x "$install_dir"/*.sh 2>/dev/null || true
+        chmod +x "$install_dir"/*.bin 2>/dev/null || true
         
         # 如果version.txt不存在或内容不同，更新它
-        if [ ! -f "$APP_DIR/$VERSION_FILE" ] || [ "$(cat "$APP_DIR/$VERSION_FILE")" != "$target_version" ]; then
+        if [ ! -f "$install_dir/$VERSION_FILE" ] || [ "$(cat "$install_dir/$VERSION_FILE")" != "$target_version" ]; then
             log_message "INFO" "正在更新版本文件，版本: $target_version"
-            echo "$target_version" > "$APP_DIR/$VERSION_FILE"
+            echo "$target_version" > "$install_dir/$VERSION_FILE"
         fi
     fi
     

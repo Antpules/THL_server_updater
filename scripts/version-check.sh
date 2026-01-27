@@ -2,7 +2,7 @@
 #
 # version-check.sh - 版本检查脚本
 # 功能：比较两个版本字符串，判断目标版本是否更新
-# 作者：AutoGen
+# 作者：RUAN
 # 版本：1.0.0
 #
 # 版本号格式：major.minor.patch.build

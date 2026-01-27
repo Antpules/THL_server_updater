@@ -40,31 +40,58 @@
 
 ## 三、安装与配置
 
-### 1. 安装步骤
+### 1. 一键安装（推荐）
 
-1. **复制文件**
-   ```bash
-   sudo cp -r update /usr/local/
-   sudo chmod +x /usr/local/update/*.sh
-   sudo chmod +x /usr/local/update/scripts/*.sh
-   ```
+```bash
+# 设置脚本可执行权限
+chmod +x install.sh
 
-2. **配置系统服务**
-   ```bash
-   sudo cp /usr/local/update/update-manager.service /etc/systemd/system/
-   sudo systemctl daemon-reload
-   sudo systemctl enable update-manager
-   sudo systemctl start update-manager
-   ```
+# 以root权限执行安装脚本
+sudo ./install.sh
+```
 
-3. **安装依赖**
-   ```bash
-   # 安装inotify-tools（用于U盘监控）
-   sudo apt-get install inotify-tools   # Debian/Ubuntu
-   sudo yum install inotify-tools       # CentOS/RHEL
-   ```
+一键安装脚本会自动完成以下操作：
+- 检查权限并创建安装目录
+- 复制所有必要的文件到安装目录
+- 设置脚本文件的执行权限
+- 配置系统服务（包括update-manager.service和websocket_server.service）
+- 安装必要的依赖（inotify-tools）
+- 启动并验证update-manager服务
+- 显示安装完成信息
 
-### 2. 配置文件设置
+### 2. 手动安装（可选）
+
+#### 2.1 复制文件
+```bash
+sudo cp -r update /usr/local/
+sudo chmod +x /usr/local/update/*.sh
+sudo chmod +x /usr/local/update/scripts/*.sh
+```
+
+#### 2.2 配置系统服务
+```bash
+# 配置update-manager服务
+sudo cp /usr/local/update/update-manager.service /etc/systemd/system/
+
+# 配置websocket_server服务（如果存在）
+if [ -f "/usr/local/update/websocket_server.service" ]; then
+    sudo cp /usr/local/update/websocket_server.service /etc/systemd/system/
+    sudo chmod +x /etc/systemd/system/websocket_server.service
+fi
+
+sudo systemctl daemon-reload
+sudo systemctl enable update-manager
+sudo systemctl start update-manager
+```
+
+#### 2.3 安装依赖
+```bash
+# 安装inotify-tools（用于U盘监控）
+sudo apt-get install inotify-tools   # Debian/Ubuntu
+sudo yum install inotify-tools       # CentOS/RHEL
+```
+
+### 3. 配置文件设置
 
 编辑 `/usr/local/update/config/update.conf` 文件，完整配置项说明：
 
@@ -351,6 +378,7 @@ sudo systemctl start server-app
 | 1.1.0 | 2026-01-19 | 支持单个可执行文件更新，优化日志管理和备份机制 |
 | 1.1.1 | 2026-01-19 | 支持递归查找U盘挂载点，修复深层目录检测问题 |
 | 1.1.2 | 2026-01-19 | 优化备份逻辑，相同版本不重复备份 |
+| 1.2.0 | 2026-01-27 | 添加一键安装脚本，支持自动安装和配置 |
 
 ## 十二、联系与支持
 
