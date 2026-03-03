@@ -106,6 +106,8 @@ sudo yum install inotify-tools       # CentOS/RHEL
 | VERSION_FILE | 版本文件名 | `version.txt` |
 | EXECUTABLE_NAME | 要更新的可执行文件名（单个可执行文件更新时生效，可选） | `` |
 | SUPPORT_SINGLE_EXECUTABLE | 是否支持单个可执行文件更新 | `true` |
+| CONFIG_DIR | 配置文件所在目录（可选，留空时不更新配置文件） | `` |
+| CONFIG_FILE | 要更新的配置文件名（可选，留空时不更新配置文件） | `` |
 | BACKUP_RETENTION | 备份保留数量 | `5` |
 | ENABLE_VERIFICATION | 启用包完整性验证 | `true` |
 | VERIFICATION_METHOD | 验证方法 | `SHA256` |
@@ -151,7 +153,9 @@ sudo yum install inotify-tools       # CentOS/RHEL
 
 1. **准备可执行文件**：确保您的可执行文件已编译完成，例如 `websocket_server`
 
-2. **创建配置文件**：在U盘根目录创建 `update.json` 文件
+2. **（可选）准备配置文件**：如果需要同时更新配置文件，创建与可执行文件同名但扩展名为 `.conf` 的配置文件，例如 `websocket_server.conf`
+
+3. **创建配置文件**：在U盘根目录创建 `update.json` 文件
    ```json
    {
      "package": "websocket_server",
@@ -162,7 +166,7 @@ sudo yum install inotify-tools       # CentOS/RHEL
    ```
    注意：`package` 字段直接填写可执行文件名，无需 `.tar.gz` 扩展名
 
-3. **复制文件**：将 `update.json` 和 `websocket_server` 可执行文件复制到U盘根目录
+4. **复制文件**：将 `update.json`、`websocket_server` 可执行文件和（可选）`websocket_server.conf` 配置文件复制到U盘根目录
 
 ##### 配置说明
 
@@ -174,7 +178,19 @@ EXECUTABLE_NAME="websocket_server"
 
 # 是否支持单个可执行文件更新
 SUPPORT_SINGLE_EXECUTABLE="true"
+
+# 配置文件所在目录（可选，留空时不更新配置文件）
+CONFIG_DIR="/home/lj/server/InterceptingPlate_Server/config"
+
+# 要更新的配置文件名（可选，留空时不更新配置文件）
+CONFIG_FILE="config.json"
 ```
+
+**配置文件更新说明**：
+- 当 `CONFIG_DIR` 和 `CONFIG_FILE` 都配置时，系统会自动检测并更新配置文件
+- 配置文件必须与 `CONFIG_FILE` 配置项指定的文件名相同，例如 `config.json`
+- 系统会在更新可执行文件的同时，将配置文件复制到指定的 `CONFIG_DIR` 目录中
+- 配置文件会与可执行文件一起备份，更新失败时会自动回滚
 
 #### 执行更新
 

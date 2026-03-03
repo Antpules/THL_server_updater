@@ -80,6 +80,16 @@ backup_current_files() {
         cp -r "$APP_DIR"/* "$backup_dir/" 2>/dev/null || true
     fi
     
+    # 备份配置文件
+    if [ -n "$CONFIG_DIR" ] && [ -n "$CONFIG_FILE" ]; then
+        local config_file="$CONFIG_DIR/$CONFIG_FILE"
+        if [ -f "$config_file" ]; then
+            log_message "INFO" "备份配置文件: $config_file"
+            mkdir -p "$backup_dir/config"
+            cp "$config_file" "$backup_dir/config/" 2>/dev/null || true
+        fi
+    fi
+    
     echo "$backup_dir"
 }
 
@@ -133,6 +143,12 @@ rollback() {
             log_message "INFO" "回滚整个应用目录"
             rm -rf "$APP_DIR"/* 2>/dev/null || true
             cp -r "$backup_dir"/* "$APP_DIR/" 2>/dev/null || true
+        fi
+        
+        # 回滚配置文件
+        if [ -n "$CONFIG_DIR" ] && [ -n "$CONFIG_FILE" ] && [ -f "$backup_dir/config/$CONFIG_FILE" ]; then
+            log_message "INFO" "回滚配置文件: $CONFIG_FILE"
+            cp "$backup_dir/config/$CONFIG_FILE" "$CONFIG_DIR/" 2>/dev/null || true
         fi
         
         start_service
@@ -189,6 +205,16 @@ deploy_update() {
         # 更新version.txt
         log_message "INFO" "正在更新版本文件，版本: $target_version"
         echo "$target_version" > "$APP_DIR/$VERSION_FILE"
+        
+        # 更新配置文件（如果提供了配置文件）
+        local config_update_path="$(dirname "$package_path")/$CONFIG_FILE"
+        if [ -f "$config_update_path" ] && [ -n "$CONFIG_DIR" ] && [ -n "$CONFIG_FILE" ]; then
+            log_message "INFO" "检测到配置文件更新: $config_update_path"
+            log_message "INFO" "正在复制配置文件到 $CONFIG_DIR/$CONFIG_FILE"
+            mkdir -p "$CONFIG_DIR"
+            cp "$config_update_path" "$CONFIG_DIR/$CONFIG_FILE"
+            log_message "INFO" "配置文件更新完成"
+        fi
     else
         # 原有tar.gz包更新流程
         log_message "INFO" "使用tar.gz包更新模式"

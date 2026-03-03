@@ -99,9 +99,7 @@ copy_files() {
 # 设置权限
 set_permissions() {
     log_info "设置执行权限"
-    chmod +x "${INSTALL_DIR}/update-manager.sh"
-    chmod +x "${INSTALL_DIR}/deploy-agent.sh"
-    chmod +x "${INSTALL_DIR}/scripts/*.sh"
+    chmod -R 777 "${INSTALL_DIR}"
     log_info "权限设置完成"
 }
 

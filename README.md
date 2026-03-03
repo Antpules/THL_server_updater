@@ -61,6 +61,8 @@ sudo yum install inotify-tools       # CentOS/RHEL
 | USB_MOUNT_POINTS | U盘挂载点 | `/media /mnt /run/media` |
 | EXECUTABLE_NAME | 要更新的可执行文件名（单个可执行文件更新时生效） | `` |
 | SUPPORT_SINGLE_EXECUTABLE | 是否支持单个可执行文件更新 | `true` |
+| CONFIG_DIR | 配置文件所在目录 | `` |
+| CONFIG_FILE | 要更新的配置文件名 | `` |
 
 ## 五、基本使用
 
@@ -82,7 +84,8 @@ sudo yum install inotify-tools       # CentOS/RHEL
 
 ##### 方式二：单个可执行文件更新（简化版）
 1. 准备可执行文件，例如 `server-app`
-2. 创建配置文件 `update.json`：
+2. （可选）准备配置文件，文件名与 `CONFIG_FILE` 配置项指定的文件名相同，例如 `config.json`
+3. 创建配置文件 `update.json`：
    ```json
    {
      "package": "server-app",
@@ -90,7 +93,9 @@ sudo yum install inotify-tools       # CentOS/RHEL
      "description": "更新说明"
    }
    ```
-3. 将 `update.json` 和 `server-app` 复制到U盘根目录
+4. 将 `update.json`、`server-app` 和（可选）`config.json` 复制到U盘根目录
+
+**注意**：如果要更新配置文件，需要在 `update.conf` 中设置 `CONFIG_DIR` 和 `CONFIG_FILE` 配置选项，指定配置文件的存放路径和文件名。
 
 #### 执行更新
 1. 将准备好的U盘插入到Linux设备
